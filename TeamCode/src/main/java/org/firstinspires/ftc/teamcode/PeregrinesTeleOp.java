@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode; // 67
 import static com.pedropathing.math.MathFunctions.normalizeAngle;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -32,7 +32,6 @@ import com.pedropathing.paths.Path;
 import com.pedropathing.paths.PathChain;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-
 import java.util.function.Supplier;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 
@@ -41,16 +40,28 @@ import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 @TeleOp
 public class PeregrinesTeleOp extends OpMode {
     DcMotorEx motorLF, motorRF, motorLB, motorRB, intake, rhinoL, rhinoR;
-    Servo eat;
+    Servo eat, stephen;
     TelemetryManager telemetryManager;
     HeadingPIDFController headingPIDFController = new HeadingPIDFController();
     GoBildaPinpointDriver pinpoint;
 
     boolean noahBeingStupid = false;
 
+    double headingFieldCentric;
+    double headingRadians;
+    double robotX;
+    double robotY;
+
+    public final double CHRISTIANITY = 0.279;
+    public final double LED_ORANGE = 0.333;
+    public final double LED_YELLOW = 0.38;
+    public final double DECLAN = 0.5;
+    public final double LED_BLUE = 0.611;
+    public final double LED_PURPLE = 0.7;
+
 
     public static PIDFCoefficients flywheelPIDF = new PIDFCoefficients(70,0,0,0.35);
-    public static double heading_p = 0, heading_d = 0, heading_f = 0;
+    public static double heading_p = 1, heading_d = 0.128, heading_f = 0.05;
     public static double flywheelVelocity = 2900;
 
     public static boolean blue = false;
@@ -86,6 +97,7 @@ public class PeregrinesTeleOp extends OpMode {
 
         eat = (Servo) hardwareMap.servo.get("eat");
         eat.setPosition(0);
+        stephen = (Servo) hardwareMap.servo.get("goon");
     }
 
     @Override
@@ -101,15 +113,22 @@ public class PeregrinesTeleOp extends OpMode {
         double velY = pinpoint.getVelY(DistanceUnit.INCH);
 
 
-
         // *************    TARGET LOGIC    *************
-        if (gamepad1.dpadDownWasPressed() || gamepad2.dpadDownWasPressed()) {
-            blue = !blue;
-        }
+
         /*if (gamepad1.dpadLeftWasPressed() || gamepad2.dpadLeftWasPressed()) {
             correctedTargetToggle = !correctedTargetToggle;
         }*/
 
+        /*if (PeregrinesPos.pos == 0 || PeregrinesPos.pos == 2) {
+            targetCurrentX = targetBlueX;
+            targetCurrentY = targetBlueY;
+        } else {
+            targetCurrentX = targetRedX;
+            targetCurrentY = targetRedY;
+        }*/
+        if (gamepad1.dpadDownWasPressed() || gamepad2.dpadDownWasPressed()) {
+            blue = !blue;
+        }
         if (blue) {
             targetCurrentX = targetBlueX;
             targetCurrentY = targetBlueY;
@@ -175,7 +194,7 @@ public class PeregrinesTeleOp extends OpMode {
         if (!noahBeingStupid) {
             if (gamepad1.right_bumper || gamepad2.right_bumper) {
                 intake.setPower(-1);
-            } else if ((gamepad1.left_bumper || gamepad2.left_bumper) && (((gamepad1.right_trigger >= 0.2 || gamepad2.right_trigger >= 0.2) && velDifference <= 20) || (gamepad1.right_trigger <= 0.2 || gamepad2.right_trigger <= 0.2))) {
+            } else if ((gamepad1.left_bumper || gamepad2.left_bumper)) { //&& (((gamepad1.right_trigger >= 0.2 || gamepad2.right_trigger >= 0.2) && velDifference <= 20) || (gamepad1.right_trigger <= 0.2 || gamepad2.right_trigger <= 0.2))) {
                 intake.setPower(1);
             } else {
                 intake.setPower(0);
@@ -186,6 +205,23 @@ public class PeregrinesTeleOp extends OpMode {
         // FLYWHEEL CODE
         rhinoL.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, flywheelPIDF);
         rhinoR.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, flywheelPIDF);
+
+        if (PeregrinesPos.isSolo) {
+            if (gamepad1.right_trigger >= 0.2) {
+                rhinoL.setVelocity(flywheelVelocity);
+                rhinoR.setVelocity(flywheelVelocity);
+                eat.setPosition(0.4);
+            }
+            else if (gamepad1.left_trigger >= 0.2) {
+                rhinoL.setVelocity(-flywheelVelocity);
+                rhinoR.setVelocity(-flywheelVelocity);
+            }
+            else {
+                rhinoL.setPower(0);
+                rhinoR.setPower(0);
+                eat.setPosition(0);
+            }
+        }
 
         if (gamepad2.right_trigger >= 0.2) {
             rhinoL.setVelocity(flywheelVelocity);
@@ -209,8 +245,21 @@ public class PeregrinesTeleOp extends OpMode {
             eat.setPosition(0);
         }*/
 
-        if (gamepad2.bWasPressed()) {
+        if (gamepad2.bWasPressed() && gamepad2.backWasPressed()) {
             noahBeingStupid = !noahBeingStupid;
+        }
+
+        if (distance <= 55) {
+            stephen.setPosition(DECLAN);
+        }
+        else if (blue) {
+            stephen.setPosition(LED_BLUE);
+        }
+        else if (!blue) {
+            stephen.setPosition(CHRISTIANITY);
+        }
+        else {
+            stephen.setPosition(LED_PURPLE);
         }
 
         telemetryManager.addData("launchVel L", rhinoL.getVelocity());
@@ -239,6 +288,8 @@ public class PeregrinesTeleOp extends OpMode {
         telemetry.update();
 
     }
+
+
 
     // Any additional methods go here
     public void initDriveMotors(DcMotor.ZeroPowerBehavior behavior) {

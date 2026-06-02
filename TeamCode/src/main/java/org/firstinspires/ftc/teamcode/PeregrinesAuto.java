@@ -1,9 +1,12 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode; //67
 
+import com.pedropathing.Drivetrain;
 import com.pedropathing.follower.Follower;
+import com.pedropathing.follower.FollowerConstants;
 import com.pedropathing.geometry.BezierCurve;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
+import com.pedropathing.localization.Localizer;
 import com.pedropathing.paths.PathChain;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
@@ -18,6 +21,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 @Autonomous(name = "CloseAuto", group = "Auto")
 public class PeregrinesAuto extends OpMode {
@@ -31,7 +35,7 @@ public class PeregrinesAuto extends OpMode {
     ElapsedTime autoTimer = new ElapsedTime();
     ElapsedTime ballTimer = new ElapsedTime();
     double delaySeconds = 0.0;
-    public static Pose endPose = new Pose();
+    public static Pose endPose = new Pose (72,72,0);//PeregrinesPos.startPos;
     final double AUTO_LENGTH_SECONDS = 30.0;
     final double AUTO_END_BUFFER_SECONDS = 1.0;
 
@@ -49,10 +53,10 @@ public class PeregrinesAuto extends OpMode {
     // Define important coordinate locations for the Blue side of the field
 
     // === Positions ===
-    private Pose startPose = new Pose(26, 129, 143);
+    private Pose startPose = PeregrinesPos.startPos;
     private Pose shootPos = new Pose(45, 114, 135);
     private Pose intakeSpikeMarkTwo = new Pose(20, 60, 180);
-    private Pose gateIntake = new Pose(10, 63, 140);
+    private Pose gateIntake = new Pose(23.18, 63.64, 138.64);
     private Pose intakeSpikeMarkOne = new Pose(20, 84, 180);
 
     // === CP ===
@@ -60,13 +64,21 @@ public class PeregrinesAuto extends OpMode {
     private Pose CP_GateIntake = new Pose(67, 73);
     private Pose CP_spikeMarkOne = new Pose(67, 80);
 
+    private Pose farPark = new Pose(16, 8, 90);
 
 
-    private PathChain launchPreload, getSpikeMarkTwo, shootSpikeMarkTwo, collectGatePath, CollectSpikeMarkOne, shootSpikeMarkOne, shootGateIntake;
+
+    private PathChain launchPreload, getSpikeMarkTwo, shootSpikeMarkTwo, collectGatePath, CollectSpikeMarkOne, shootSpikeMarkOne, shootGateIntake, farParkPath;
 
 
     @Override
     public void init() {
+
+        String pinpointName = Constants.localizerConstants.hardwareMapName;
+        GoBildaPinpointDriver.EncoderDirection forwardDirection = Constants.localizerConstants.forwardEncoderDirection;
+        GoBildaPinpointDriver.EncoderDirection strafeDirection = Constants.localizerConstants.strafeEncoderDirection;
+        GoBildaPinpointDriver.GoBildaOdometryPods resolution = Constants.localizerConstants.encoderResolution;
+
         headingPIDFController.PIDFController(heading_p, 0 ,heading_d, heading_f);
 
         intake = (DcMotorEx) hardwareMap.dcMotor.get("intake");
@@ -86,36 +98,29 @@ public class PeregrinesAuto extends OpMode {
 
         eat = (Servo) hardwareMap.servo.get("eat");
         eat.setPosition(0);
+
+        follower = Constants.createFollower(hardwareMap);
+        buildPaths();
+        follower.setStartingPose(startPose);
     }
 
     @Override
     public void init_loop() {
 
-        // Modify the delay before the autonomous begins
-        if (gamepad1.dpadUpWasPressed() || gamepad2.dpadUpWasPressed()) {
-            isBlue = !isBlue;
-        }
-
-        if (isBlue) {
-            location = "Blue";
-        }
-        else {
-            location = "Red";
-        }
-
         telemetry.addData("Delay in seconds", delaySeconds);
-        telemetry.addData("Location", location);
+        telemetry.addData("Location", PeregrinesPos.positions[PeregrinesPos.pos]);
         telemetry.update();
 
     }
 
     @Override
     public void start() {
-        if (!isBlue) {
-            startPose = startPose.mirror();
+        if (PeregrinesPos.pos == 1 || PeregrinesPos.pos == 3) {
+            endPose = endPose.mirror();
+
             shootPos = shootPos.mirror();
             intakeSpikeMarkTwo = intakeSpikeMarkTwo.mirror();
-            gateIntake = gateIntake.mirror();
+            gateIntake = new Pose(132.93, 53.48, 32.2);
             intakeSpikeMarkOne = intakeSpikeMarkOne.mirror();
 
             CP_SpikeMarkTwo = CP_SpikeMarkTwo.mirror();
@@ -132,8 +137,14 @@ public class PeregrinesAuto extends OpMode {
     @Override
     public void loop() {
         follower.update(); // Update Pedro Pathing - will also cause the robot to follow the current path
-        autonomousPathUpdate(); // Update autonomous state machine
+        if (PeregrinesPos.pos == 0 || PeregrinesPos.pos == 1) {
+            autonomousPathUpdateClose(); // Update autonomous state machine
+        }
+        if (PeregrinesPos.pos == 2 || PeregrinesPos.pos == 3) {
+            autonomousPathUpdateFar(); // Update auto state machine
+        }
         endPose = follower.getPose();
+        pinpoint.update();
     }
 
     public void buildPaths() {
@@ -170,10 +181,15 @@ public class PeregrinesAuto extends OpMode {
                 .addPath(new BezierCurve(intakeSpikeMarkOne, CP_spikeMarkOne, shootPos))
                 .setLinearHeadingInterpolation(intakeSpikeMarkOne.getHeading(), shootPos.getHeading())
                 .build();
+
+        farParkPath = follower.pathBuilder()
+                .addPath(new BezierLine(startPose, farPark))
+                .setLinearHeadingInterpolation(startPose.getHeading(), farPark.getHeading())
+                .build();
     }
 
 
-    public void autonomousPathUpdate() {
+    public void autonomousPathUpdateClose() {
 
         // Autonomous state machine
         switch (pathState) {
@@ -187,7 +203,6 @@ public class PeregrinesAuto extends OpMode {
                 break;
             case 1: // 3
                 if (!follower.isBusy()) {
-                    PeregrinesConfig.launchBalls();
                     PeregrinesConfig.launchBalls();
                     pathState = 2;
                 }
@@ -270,6 +285,19 @@ public class PeregrinesAuto extends OpMode {
                 if (!follower.isBusy()) {
                     PeregrinesConfig.launchBalls(); // 15
                     pathState = -1; // END AUTO ROUTE!!! WOOO 15 BALL AUTO?!?!?! (hopefully)
+                }
+                break;
+        }
+    }
+
+    public void autonomousPathUpdateFar() {
+        switch (pathState) {
+            case 0:
+                // Wait for the starting delay to expire
+                if (delayTimer.seconds() > delaySeconds) {
+                    // Begin the whole route
+                    follower.followPath(farParkPath, true);
+                    pathState = 1;
                 }
                 break;
         }
