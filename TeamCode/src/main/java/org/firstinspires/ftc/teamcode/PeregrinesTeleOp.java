@@ -61,8 +61,8 @@ public class PeregrinesTeleOp extends OpMode {
 
 
     public static PIDFCoefficients flywheelPIDF = new PIDFCoefficients(70,0,0,0.35);
-    public static double heading_p = 1, heading_d = 0.128, heading_f = 0.05;
-    public static double flywheelVelocity = 2900;
+    public static double heading_p = 1, heading_d = 0.097, heading_f = 0.03;
+    public static double flywheelVelocity = 2900, leftMult = 1.1;
 
     public static boolean blue = false;
     double targetBlueX = 10, targetBlueY = 140;
@@ -208,12 +208,12 @@ public class PeregrinesTeleOp extends OpMode {
 
         if (PeregrinesPos.isSolo) {
             if (gamepad1.right_trigger >= 0.2) {
-                rhinoL.setVelocity(flywheelVelocity);
+                rhinoL.setVelocity(flywheelVelocity * leftMult);
                 rhinoR.setVelocity(flywheelVelocity);
                 eat.setPosition(0.4);
             }
             else if (gamepad1.left_trigger >= 0.2) {
-                rhinoL.setVelocity(-flywheelVelocity);
+                rhinoL.setVelocity(-flywheelVelocity * leftMult);
                 rhinoR.setVelocity(-flywheelVelocity);
             }
             else {
@@ -224,8 +224,9 @@ public class PeregrinesTeleOp extends OpMode {
         }
 
         if (gamepad2.right_trigger >= 0.2) {
+            flywheelVelocity = (14.70469*distance)+1721.36088;
             rhinoL.setVelocity(flywheelVelocity);
-            rhinoR.setVelocity(flywheelVelocity);
+            rhinoR.setVelocity(flywheelVelocity-50);
             eat.setPosition(0.4);
         }
         else if (gamepad2.left_trigger >= 0.2) {
@@ -249,7 +250,7 @@ public class PeregrinesTeleOp extends OpMode {
             noahBeingStupid = !noahBeingStupid;
         }
 
-        if (distance <= 55) {
+        if (distance <= 67 && distance >= 40) {
             stephen.setPosition(DECLAN);
         }
         else if (blue) {
@@ -286,7 +287,6 @@ public class PeregrinesTeleOp extends OpMode {
         telemetry.addData("targetY", targetCurrentY);
         //telemetry.addData("in close launch", launchDetection());
         telemetry.update();
-
     }
 
 
