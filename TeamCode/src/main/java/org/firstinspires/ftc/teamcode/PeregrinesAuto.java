@@ -35,7 +35,7 @@ public class PeregrinesAuto extends OpMode {
     ElapsedTime autoTimer = new ElapsedTime();
     ElapsedTime ballTimer = new ElapsedTime();
     double delaySeconds = 0.0;
-    public static Pose endPose = new Pose (72,72,0);//PeregrinesPos.startPos;
+    public static Pose endPose = new Pose (72,72,0); //PeregrinesPos.startPos;
     final double AUTO_LENGTH_SECONDS = 30.0;
     final double AUTO_END_BUFFER_SECONDS = 1.0;
 
