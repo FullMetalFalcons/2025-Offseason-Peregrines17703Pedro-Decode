@@ -393,6 +393,7 @@ public class PeregrinesTeleOp extends OpMode {
         telemetry.addData("targetX", targetCurrentX);
         telemetry.addData("targetY", targetCurrentY);
         telemetry.addData("Y INTERCEPT", yIntercept);
+        telemetry.addData("Target Velocity", (14.70469 * distance) + yIntercept);
         //telemetry.addData("in close launch", launchDetection());
         telemetry.update();
     }
