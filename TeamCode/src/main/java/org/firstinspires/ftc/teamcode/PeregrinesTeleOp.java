@@ -67,7 +67,7 @@ public class PeregrinesTeleOp extends OpMode {
         15,
         0,
         0.5
-    );
+    ); // TYSM TREVOR ILYYY!!!
     public static double heading_p = 1,
         heading_d = 0.097,
         heading_f = 0.03;
