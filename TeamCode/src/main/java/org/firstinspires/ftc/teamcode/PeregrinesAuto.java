@@ -34,6 +34,7 @@ public class PeregrinesAuto extends OpMode {
     ElapsedTime delayTimer = new ElapsedTime();
     ElapsedTime autoTimer = new ElapsedTime();
     ElapsedTime ballTimer = new ElapsedTime();
+    ElapsedTime GateTimer = new ElapsedTime();
     double delaySeconds = 0.0;
     public static Pose endPose = new Pose (72,72,0); //PeregrinesPos.startPos;
     final double AUTO_LENGTH_SECONDS = 30.0;
@@ -47,28 +48,30 @@ public class PeregrinesAuto extends OpMode {
 
     public static PIDFCoefficients flywheelPIDF = new PIDFCoefficients(70,0,0,0.35);
     public static double heading_p = 0, heading_d = 0, heading_f = 0;
-    public static double flywheelVelocity = 2900;
+    public static double flywheelVelocity = 2150;
 
 
     // Define important coordinate locations for the Blue side of the field
 
     // === Positions ===
     private Pose startPose = PeregrinesPos.startPos;
-    private Pose shootPos = new Pose(45, 114, 135);
-    private Pose intakeSpikeMarkTwo = new Pose(20, 60, 180);
-    private Pose gateIntake = new Pose(23.18, 63.64, 138.64);
-    private Pose intakeSpikeMarkOne = new Pose(20, 84, 180);
+    private Pose shootPos = new Pose(45, 114, Math.toRadians(145));
+    private Pose intakeSpikeMarkTwo = new Pose(15, 60, Math.toRadians(180));
+    private Pose gateIntake = new Pose(12.55, 59.25, Math.toRadians(143.07));
+    private Pose intakeSpikeMarkOne = new Pose(25, 84, Math.toRadians(180));
 
     // === CP ===
     private Pose CP_SpikeMarkTwo = new Pose(67, 55);
     private Pose CP_GateIntake = new Pose(67, 73);
     private Pose CP_spikeMarkOne = new Pose(67, 80);
 
-    private Pose farPark = new Pose(16, 8, 90);
+    // === PARKING ===
+    private Pose farPark = new Pose(16, 8, Math.toRadians(90));
+    private Pose parkClose = new Pose(27, 91, 145);
 
 
 
-    private PathChain launchPreload, getSpikeMarkTwo, shootSpikeMarkTwo, collectGatePath, CollectSpikeMarkOne, shootSpikeMarkOne, shootGateIntake, farParkPath;
+    private PathChain launchPreload, getSpikeMarkTwo, shootSpikeMarkTwo, collectGatePath, CollectSpikeMarkOne, shootSpikeMarkOne, shootGateIntake, farParkPath, pathofpark;
 
 
     @Override
@@ -81,23 +84,22 @@ public class PeregrinesAuto extends OpMode {
 
         headingPIDFController.PIDFController(heading_p, 0 ,heading_d, heading_f);
 
-        intake = (DcMotorEx) hardwareMap.dcMotor.get("intake");
-        rhinoL = (DcMotorEx)  hardwareMap.dcMotor.get("rhinoL");
-        rhinoR = (DcMotorEx) hardwareMap.dcMotor.get("rhinoR");
+        PeregrinesConfig.init(hardwareMap);
 
-        intake.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
-        rhinoL.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rhinoR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        if (PeregrinesPos.pos == 1 || PeregrinesPos.pos == 3) {
+            endPose = endPose.mirror();
 
-        rhinoL.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        rhinoR.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            shootPos = shootPos.mirror();
+            intakeSpikeMarkTwo = intakeSpikeMarkTwo.mirror();
+            gateIntake = new Pose(132.44, 61.76, Math.toRadians(34.9));
+            intakeSpikeMarkOne = intakeSpikeMarkOne.mirror();
 
-        intake.setDirection(DcMotorSimple.Direction.FORWARD);
-        rhinoL.setDirection(DcMotorSimple.Direction.REVERSE);
-        rhinoR.setDirection(DcMotorSimple.Direction.FORWARD);
+            CP_SpikeMarkTwo = CP_SpikeMarkTwo.mirror();
+            CP_spikeMarkOne = CP_spikeMarkOne.mirror();
+            CP_GateIntake = CP_GateIntake.mirror();
+            parkClose = parkClose.mirror();
+        }
 
-        eat = (Servo) hardwareMap.servo.get("eat");
-        eat.setPosition(0);
 
         follower = Constants.createFollower(hardwareMap);
         buildPaths();
@@ -109,42 +111,44 @@ public class PeregrinesAuto extends OpMode {
 
         telemetry.addData("Delay in seconds", delaySeconds);
         telemetry.addData("Location", PeregrinesPos.positions[PeregrinesPos.pos]);
+
         telemetry.update();
 
     }
 
     @Override
     public void start() {
-        if (PeregrinesPos.pos == 1 || PeregrinesPos.pos == 3) {
-            endPose = endPose.mirror();
-
-            shootPos = shootPos.mirror();
-            intakeSpikeMarkTwo = intakeSpikeMarkTwo.mirror();
-            gateIntake = new Pose(132.93, 53.48, 32.2);
-            intakeSpikeMarkOne = intakeSpikeMarkOne.mirror();
-
-            CP_SpikeMarkTwo = CP_SpikeMarkTwo.mirror();
-            CP_spikeMarkOne = CP_spikeMarkOne.mirror();
-            CP_GateIntake = CP_GateIntake.mirror();
-        }
-
         delayTimer.reset();
         autoTimer.reset();
         ballTimer.reset();
+
+       /* if (PeregrinesPos.pos == 1) {
+            flywheelVelocity = (14.70469 * 48.5677) + 1641;
+        }
+        if (PeregrinesPos.pos == 0) {
+            flywheelVelocity = 2200;
+        }
+        */
 
     }
 
     @Override
     public void loop() {
         follower.update(); // Update Pedro Pathing - will also cause the robot to follow the current path
+        PeregrinesConfig.update();
+        endPose = follower.getPose();
+
         if (PeregrinesPos.pos == 0 || PeregrinesPos.pos == 1) {
             autonomousPathUpdateClose(); // Update autonomous state machine
         }
         if (PeregrinesPos.pos == 2 || PeregrinesPos.pos == 3) {
             autonomousPathUpdateFar(); // Update auto state machine
         }
-        endPose = follower.getPose();
-        pinpoint.update();
+
+        telemetry.addData("PathState", pathState);
+        telemetry.addData("Busy", follower.isBusy());
+        telemetry.addData("Is Intaking?", PeregrinesConfig.isIntaking);
+        telemetry.update();
     }
 
     public void buildPaths() {
@@ -186,6 +190,10 @@ public class PeregrinesAuto extends OpMode {
                 .addPath(new BezierLine(startPose, farPark))
                 .setLinearHeadingInterpolation(startPose.getHeading(), farPark.getHeading())
                 .build();
+        pathofpark = follower.pathBuilder()
+                .addPath(new BezierLine(shootPos, parkClose))
+                .setConstantHeadingInterpolation(145)
+                .build();
     }
 
 
@@ -197,6 +205,7 @@ public class PeregrinesAuto extends OpMode {
                 // Wait for the starting delay to expire
                 if (delayTimer.seconds() > delaySeconds) {
                     // Begin the whole route
+                    PeregrinesConfig.spinUpFlyWheels();
                     follower.followPath(launchPreload, true);
                     pathState = 1;
                 }
@@ -216,8 +225,9 @@ public class PeregrinesAuto extends OpMode {
                 break;
             case 3:
                 if (!follower.isBusy()) {
-                    PeregrinesConfig.toggleIntake(); // off
                     follower.followPath(shootSpikeMarkTwo);
+                    PeregrinesConfig.toggleIntake(); // off
+                    PeregrinesConfig.spinUpFlyWheels();
                     pathState = 4;
                 }
                 break;
@@ -231,14 +241,18 @@ public class PeregrinesAuto extends OpMode {
                 if (!PeregrinesConfig.isLaunching) {
                     PeregrinesConfig.toggleIntake(); // on
                     follower.followPath(collectGatePath);
+                    GateTimer.reset();
                     pathState = 6;
                 }
                 break;
             case 6:
                 if (!follower.isBusy()) {
-                    PeregrinesConfig.toggleIntake(); // off
-                    follower.followPath(shootGateIntake);
-                    pathState = 7;
+                    if (GateTimer.seconds() >= 3.8) {
+                        PeregrinesConfig.toggleIntake(); // off
+                        PeregrinesConfig.spinUpFlyWheels();
+                        follower.followPath(shootGateIntake);
+                        pathState = 7;
+                    }
                 }
                 break;
             case 7: // 9
@@ -251,14 +265,18 @@ public class PeregrinesAuto extends OpMode {
                 if (!PeregrinesConfig.isLaunching) {
                     PeregrinesConfig.toggleIntake(); // on
                     follower.followPath(collectGatePath);
-                    pathState = 9;
+                    GateTimer.reset();
+                        pathState = 9;
                 }
                 break;
             case 9:
                 if (!follower.isBusy()) {
-                   PeregrinesConfig.toggleIntake(); // off
-                    follower.followPath(shootGateIntake);
-                    pathState = 10;
+                    if (GateTimer.seconds() >= 3.8) {
+                        PeregrinesConfig.toggleIntake(); // off
+                        PeregrinesConfig.spinUpFlyWheels();
+                        follower.followPath(shootGateIntake);
+                        pathState = 10;
+                    }
                 }
                 break;
             case 10:
@@ -276,17 +294,23 @@ public class PeregrinesAuto extends OpMode {
                 break;
             case 12:
                 if (!follower.isBusy()) {
-                    PeregrinesConfig.toggleIntake(); // off
-                    follower.followPath(shootSpikeMarkOne);
-                    pathState = 13;
+                        PeregrinesConfig.toggleIntake(); // off
+                        PeregrinesConfig.spinUpFlyWheels();
+                        follower.followPath(shootSpikeMarkOne);
+                        pathState = 13;
                 }
                 break;
             case 13:
                 if (!follower.isBusy()) {
                     PeregrinesConfig.launchBalls(); // 15
-                    pathState = -1; // END AUTO ROUTE!!! WOOO 15 BALL AUTO?!?!?! (hopefully)
+                    pathState = 14; // END AUTO ROUTE!!! WOOO 15 BALL AUTO?!?!?! (hopefully)
                 }
                 break;
+            case 14:
+                if (!PeregrinesConfig.isLaunching) {
+                    follower.followPath(pathofpark);
+                    pathState = -1;
+                }
         }
     }
 

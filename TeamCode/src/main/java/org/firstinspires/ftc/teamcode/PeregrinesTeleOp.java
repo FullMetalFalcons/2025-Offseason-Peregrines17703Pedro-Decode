@@ -47,11 +47,13 @@ public class PeregrinesTeleOp extends OpMode {
 
     boolean noahBeingStupid = false;
     ElapsedTime timer = new ElapsedTime();
+    double yIntercept = 2121.36088;
 
     double headingFieldCentric;
     double headingRadians;
     double robotX;
     double robotY;
+    boolean fieldCentricInUse = true;
 
     public final double CHRISTIANITY = 0.279;
     public final double LED_ORANGE = 0.333;
@@ -114,10 +116,10 @@ public class PeregrinesTeleOp extends OpMode {
         eat.setPosition(0);
         stephen = (Servo) hardwareMap.servo.get("goon");
 
-        if (PeregrinesPos.pos == 0 || PeregrinesPos.pos == 1) {
+        if (PeregrinesPos.pos == 0 || PeregrinesPos.pos == 2) {
             blue = true;
         }
-        if (PeregrinesPos.pos == 1 || PeregrinesPos.pos == 2) {
+        if (PeregrinesPos.pos == 1 || PeregrinesPos.pos == 3) {
             blue = false;
         }
     }
@@ -126,6 +128,12 @@ public class PeregrinesTeleOp extends OpMode {
     public void loop() {
         // *************    ODOMETRY    *************
         pinpoint.update();
+        if (blue) {
+            headingFieldCentric = -pinpoint.getHeading(AngleUnit.RADIANS) + Math.PI;
+        }
+        if (!blue) {
+            headingFieldCentric = pinpoint.getHeading(AngleUnit.RADIANS);
+        }
 
         double currentX = pinpoint.getPosX(DistanceUnit.INCH);
         double currentY = pinpoint.getPosY(DistanceUnit.INCH);
@@ -146,7 +154,39 @@ public class PeregrinesTeleOp extends OpMode {
             targetCurrentX = targetRedX;
             targetCurrentY = targetRedY;
         }*/
-        if (gamepad1.dpadDownWasPressed() || gamepad2.dpadDownWasPressed()) {
+
+        // ....... MECANUM DRIVE CONTROLS .......
+        // Set the desired powers based on joystick inputs (or dpad, for slow mode)
+        double desiredForward = -gamepad1.left_stick_y;
+        double desiredStrafe = gamepad1.left_stick_x;
+
+        if (blue) {
+            headingFieldCentric = pinpoint.getHeading(AngleUnit.RADIANS) + Math.PI;
+        } else {
+            headingFieldCentric = pinpoint.getHeading(AngleUnit.RADIANS);
+        }
+
+        double powerAngular = -gamepad1.right_stick_x;
+        double powerForward = desiredForward;  // Assume field-centric is not being used
+        double powerStrafe = desiredStrafe;    // Assume field-centric is not being used
+
+        // FIELD CENTRIC MODIFICATIONS AND TOGGLE CONTROL
+        // Modify powers based on robot heading for field-centric drive
+        if (fieldCentricInUse) {
+            powerForward = (desiredForward * Math.cos(headingFieldCentric)) - (desiredStrafe * Math.sin(headingFieldCentric));
+            powerStrafe = (desiredStrafe * Math.cos(headingFieldCentric)) + (desiredForward * Math.sin(headingFieldCentric));
+        }
+        if (!fieldCentricInUse) {
+            powerStrafe = gamepad1.left_stick_x;
+            powerForward = -gamepad1.left_stick_y;
+        }
+        // Be able to toggle field centric drive in case the Pinpoint fails somehow
+        if (gamepad1.backWasPressed()) {
+            fieldCentricInUse = !fieldCentricInUse;
+        }
+
+
+        if (gamepad2.dpadDownWasPressed()) {
             blue = !blue;
         }
         if (blue) {
@@ -201,19 +241,17 @@ public class PeregrinesTeleOp extends OpMode {
         );
 
         if (gamepad2.right_trigger > 0.2) {
-            powerAng = headingPIDFController.run(headingError);
-            powerAng = Math.max(-1.0, Math.min(1.0, powerAng));
+            powerAngular = headingPIDFController.run(headingError);
+            powerAngular = Math.max(-1.0, Math.min(1.0, powerAngular));
             targetTrack = true;
         } else {
-            powerAng = -gamepad1.right_stick_x;
+            powerAngular = -gamepad1.right_stick_x;
             targetTrack = false;
         }
 
-        powerX = gamepad1.left_stick_x;
-        powerY = -gamepad1.left_stick_y;
 
         if (!noahBeingStupid) {
-            mecanumDriveCode(powerY, powerX, powerAng, 1.0);
+            mecanumDriveCode(powerForward, powerStrafe, powerAngular, 1.0);
         }
 
         // *************    LAUNCHER    *************
@@ -221,16 +259,14 @@ public class PeregrinesTeleOp extends OpMode {
             rhinoL.getVelocity() - rhinoR.getVelocity()
         );
 
-        if (!noahBeingStupid) {
-            if (gamepad1.right_bumper || gamepad2.right_bumper) {
+            if ((gamepad1.right_bumper && !noahBeingStupid) || gamepad2.right_bumper) {
                 intake.setPower(-1);
-            } else if ((gamepad1.left_bumper || gamepad2.left_bumper)) {
+            } else if (((gamepad1.left_bumper && !noahBeingStupid) || gamepad2.left_bumper)) {
                 //&& (((gamepad1.right_trigger >= 0.2 || gamepad2.right_trigger >= 0.2) && velDifference <= 20) || (gamepad1.right_trigger <= 0.2 || gamepad2.right_trigger <= 0.2))) {
                 intake.setPower(1);
             } else {
                 intake.setPower(0);
             }
-        }
 
         // FLYWHEEL CODE
         rhinoL.setPIDFCoefficients(
@@ -244,9 +280,9 @@ public class PeregrinesTeleOp extends OpMode {
 
         if (PeregrinesPos.isSolo) {
             if (gamepad1.right_trigger >= 0.2) {
-                flywheelVelocity = (14.70469 * distance) + 1721.36088;
+                flywheelVelocity = (14.70469 * distance) + yIntercept;
                 rhinoL.setVelocity(flywheelVelocity);
-                rhinoR.setVelocity(flywheelVelocity - 50);
+                rhinoR.setVelocity(flywheelVelocity - 63);
                 eat.setPosition(0.4);
             } else if (gamepad1.left_trigger >= 0.2) {
                 rhinoL.setVelocity(-flywheelVelocity);
@@ -258,10 +294,23 @@ public class PeregrinesTeleOp extends OpMode {
             }
         }
 
+        if (gamepad1.dpadDownWasPressed() || gamepad2.dpadLeftWasPressed()) {
+            yIntercept += 100;
+        }
+        if (gamepad1.dpadDownWasPressed() || gamepad2.dpadRightWasPressed()) {
+            yIntercept -= 100;
+        }
+
+        if (noahBeingStupid) {
+            powerForward = 0;
+            powerStrafe = 0;
+            powerAngular = 0;
+        }
+
         if (gamepad2.right_trigger >= 0.2) {
-            flywheelVelocity = (14.70469 * distance) + 1721.36088;
+            flywheelVelocity = (14.70469 * distance) + yIntercept;
             rhinoL.setVelocity(flywheelVelocity);
-            rhinoR.setVelocity(flywheelVelocity - 50);
+            rhinoR.setVelocity(flywheelVelocity - 75);
             eat.setPosition(0.4);
         } else if (gamepad2.left_trigger >= 0.2) {
             rhinoL.setVelocity(-flywheelVelocity);
@@ -305,7 +354,7 @@ public class PeregrinesTeleOp extends OpMode {
                 }
             }
         }
-        if (distance <= 67 && distance >= 40) {
+        if (distance <= 79 && distance >= 40) {
             stephen.setPosition(DECLAN);
         } else if (blue) {
             stephen.setPosition(LED_BLUE);
@@ -343,6 +392,7 @@ public class PeregrinesTeleOp extends OpMode {
         telemetry.addData("targetHeading", Math.toDegrees(targetHeading));
         telemetry.addData("targetX", targetCurrentX);
         telemetry.addData("targetY", targetCurrentY);
+        telemetry.addData("Y INTERCEPT", yIntercept);
         //telemetry.addData("in close launch", launchDetection());
         telemetry.update();
     }
@@ -403,12 +453,7 @@ public class PeregrinesTeleOp extends OpMode {
         );
     }
 
-    public void mecanumDriveCode(
-        double forward,
-        double strafe,
-        double angular,
-        double speedPercent
-    ) {
+    public void mecanumDriveCode(double forward, double strafe, double angular, double speedPercent) {
         // Perform vector math to determine the desired powers for each wheel
         double powerLF = strafe + forward - angular;
         double powerLB = -strafe + forward - angular;
@@ -422,10 +467,10 @@ public class PeregrinesTeleOp extends OpMode {
         max = Math.max(max, Math.abs(powerRB));
 
         // Scale all power variables down to a number between 0 and 1 (so that setPower will accept them)
-        motorLF.setPower((powerLF / max) * speedPercent);
-        motorLB.setPower((powerLB / max) * speedPercent);
-        motorRF.setPower((powerRF / max) * speedPercent);
-        motorRB.setPower((powerRB / max) * speedPercent);
+        motorLF.setPower(powerLF /max * speedPercent);
+        motorLB.setPower(powerLB /max * speedPercent);
+        motorRF.setPower(powerRF /max * speedPercent);
+        motorRB.setPower(powerRB /max * speedPercent);
     }
 
     public double determineRotationDirection(double current, double target) {
