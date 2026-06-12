@@ -63,10 +63,10 @@ public class PeregrinesTeleOp extends OpMode {
     public final double LED_PURPLE = 0.7;
 
     public static PIDFCoefficients flywheelPIDF = new PIDFCoefficients(
-        70,
+        150,
+        15,
         0,
-        0,
-        0.35
+        0.5
     );
     public static double heading_p = 1,
         heading_d = 0.097,
